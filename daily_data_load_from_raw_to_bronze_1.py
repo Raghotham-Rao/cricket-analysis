@@ -135,7 +135,7 @@ innings_df = joined_df.select(
 
 # COMMAND ----------
 
-# innings_df.write.format('delta').mode('append').save(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/innings/data')
+innings_df.write.format('delta').mode('append').save(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/innings/data')
 
 # COMMAND ----------
 
