@@ -131,11 +131,17 @@ innings_df = joined_df.select(
     F.current_timestamp().alias("processed_timestamp"),
     *joined_df.columns[:6],
     "innings"
+).withColumn(
+    "innings",
+    F.transform(
+        "innings",
+        lambda x: x.withField("target", x["target"].cast("struct<overs:double,runs:bigint>"))
+    )
 )
 
 # COMMAND ----------
 
-innings_df.write.format('delta').mode('append').save(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/innings/data')
+innings_df.write.format('delta').mode('append').option("mergeSchema", "true").save(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/innings/data')
 
 # COMMAND ----------
 
@@ -148,11 +154,21 @@ registry_df = spark.createDataFrame([[i.name] for i in joined_df.select("info.re
 
 # COMMAND ----------
 
-registry_df.select("name").distinct().write.format('delta').mode('append').save(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/registry/data')
+registry_target = spark.read.load(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/registry/data')
 
 # COMMAND ----------
 
-registry_target = spark.read.load(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/registry/data')
+new_players = None
+try:
+    new_players = registry_df.alias("d").join(
+        registry_target.alias("t"),
+        on=F.expr('''d.name = t.name'''),
+        how="left_anti"
+    )
+except:
+    new_players = registry_df
+finally:
+    new_players.select("name").distinct().write.format('delta').mode('append').save(f'abfss://bronze0@{storage_account_name}.dfs.core.windows.net/registry/data')
 
 # COMMAND ----------
 
